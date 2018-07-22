@@ -1,68 +1,144 @@
 <?php
 
-$app->get('/session', function() {
-    $db = new DbHandler();
-    $session = $db->getSession();
-    $response["_id"] = $session['_id'];
-    $response["username"] = $session['username'];
-    $response["email"] = $session['email'];
-    $response["firstname"] = $session['firstname'];
-    $response["lastname"] = $session['lastname'];
-    $response["createdAt"] = $session['createdAt'];
-    echoResponse(200, $session);
-});
+    class auth
+    {
 
-$app->post('/login', function() use ($app) {
-    require_once 'passwordHash.php';
-    $r = json_decode($app->request->getBody());
-    verifyRequiredParams(array('username', 'password'),$r);
-    $response = array();
-    $db = new DbHandler();
+        private $conn;
 
-    $matnum = $r->matricnumber;
-    $r->matnum = $matnum;
-    $password = $r->password;
-    $r->secret_key = $password;
+        function __construct()
+        {
+            require_once dirname(__FILE__) . '/DbConnect.php';
+            $db = new DbConnect;
+            $this->conn = $db->connect();
+        }
 
-    $user = $db->getOneRecord("select _id,fullname, email, secret_key, matnum from peanuts where matnum='$matnum'");
-    if ($user != NULL) {
-        if(passwordHash::check_password($user['secret_key'],$password)){
-            $response['status'] = "success";
-            $response['message'] = 'Login was successful';
-            $response['_id'] = $user['_id'];
-            $response['username'] = $user['username'];
-            $response['email'] = $user['email'];
-            $response['matnum'] = $user['matnum'];
+        public function CreateUser($name, $email, $matnum, $username, $password)
+        {
+           if(!$this->isEmailExist($email))
+           {
+                $stmt = $this->conn->prepare("INSERT INTO users (name, email, matnum, username, password) VALUES (?, ?, ?, ?, ?)");
+                $stmt->bind_param("sssss", $name, $email, $matnum, $username, $password);
+                if($stmt->execute())
+                {
+                    return USER_CREATED;
+                }else {
+                    return USER_FAILED;
+                }
+           }
+           return USER_EXISTS;
+        }
 
-            if (!isset($_SESSION)) {
+        public function userLogin($email, $username, $password)
+        {
+            require_once dirname(__FILE__) . '/passwordHash.php';
+            if($this->isEmailExist($email))
+            {
+                $secret_key = $this->getUserPassword($email, $username);
+                if(passwordHash::check_password($secret_key, $password))
+                {
+                    if(!isset($_SESSION))
+                    {
+                        session_start();
+                    }
+                    $_SESSION['id'] = 'id';
+                    return USER_VERIFIED;
+                }else {
+                    return USER_PASS_ERR;
+                }
+            }else {
+                return USER_NULL;
+            }
+        }
+
+        private function getUserPassword($data, $password)
+        {
+            $stmt = $this->conn->prepare("SELECT email, username, password FROM users WHERE 
+            email = $data OR username = $data");
+            $stmt->execute();
+            $stmt->bind_result($password);
+            $stmt->fetch();
+            return $password;
+        }
+
+        public function getSession()
+        {
+            if(!isset($_SESSION))
+            {
                 session_start();
             }
-
-            $_SESSION['_id'] = $user['_id'];
-            $_SESSION['fullname'] = $user['fullname'];
-            $_SESSION['email'] = $user['email'];
-            $_SESSION['matnum'] = $user['matnum'];
-
-            echoResponse(200, $response);
-        } else {
-            $response['status'] = "error";
-            $response['message'] = 'Login failed. Incorrect credentials';
-            echoResponse(201, $response);
-        }
-    }else {
-            $response['status'] = "error";
-            $response['message'] = 'No such user is registered';
-            echoResponse(201, $response);
+            $sess = array();
+            if(isset($_SESSION['id']))
+            {
+                $sess["id"] = $_SESSION['id'];
+                $sess["createdAt"] = $_SESSION['createdAt'];
+            }else {
+                $sess = "Error";
+            }
+            return $sess;
         }
 
-});
+        public function destroySession(){
+            if (!isset($_SESSION))
+            {
+                session_start();
+            }
+            if(isSet($_SESSION['id']))
+            {
+                unset($_SESSION['id']);
+                unset($_SESSION['createdAt']);
+                session_destroy();
+                session_unset();
+                $info='info';
+                if(isSet($_COOKIE[$info]))
+                {
+                    setcookie ($info, '', time() - $cookie_time);
+                }
+                $msg = "Logged Out Successfully...";
+            }
+            else
+            {
+                $msg = "Not logged in...";
+            }
+            return $msg;
+        }
 
-$app->get('/logout', function() {
-    $db = new DbHandler();
-    $session = $db->destroySession();
-    $response["status"] = "info";
-    $response["message"] = "Logged out successfully";
-    echoResponse(200, $response);
-});
+       /* private function getUserPasswordByEmail($email)
+        {
+            $stmt = $this->conn->prepare("SELECT password FROM users WHERE email = ?");
+            $stmt->bind_param("s", $email);
+            $stmt->execute();
+            $stmt->bind_result($password);
+            $stmt->fetch();
+            return $password;
+        }
 
-?>
+        private function getUserPasswordByUsername($username)
+        {
+            $stmt = $this->conn->prepare("SELECT password FROM users WHERE username = ?");
+            $stmt->bind_param("s", $username);
+            $stmt->execute();
+            $stmt->bind_result($password);
+            $stmt->fetch();
+            return $password;
+        }*/
+
+        private function isEmailExist($email)
+        {
+            $stmt = $this->conn->prepare("SELECT id FROM users WHERE email = ?");
+            $stmt->bind_param("s", $email);
+            $stmt->execute();
+            $stmt->store_results();
+            return $stmt->num_rows > 0;
+        }
+
+        private function isUsernameExist($username)
+        {
+            $stmt = $this->conn->prepare("SELECT id FROM users WHERE username = ?");
+            $stmt->bind_param("s", $username);
+            $stmt->execute();
+            $stmt->store_results();
+            return $stmt->num_rows > 0;
+        }
+
+
+    }

@@ -1,8 +1,9 @@
 <?php
+
 define('DB_HOST', 'localhost');
 define('DB_USER', 'root');
 define('DB_PASS', '');
-define('DB_NAME',  'netsurf_test');
+define('DB_NAME',  'quick_cashier');
 
 define('USER_CREATED', 101);
 define('USER_EXISTS', 102);
