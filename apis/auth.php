@@ -12,52 +12,105 @@
             $this->conn = $db->connect();
         }
 
-        public function CreateUser($name, $email, $matnum, $username, $password)
+        public function CreateUser($name, $email, $matnum, $username, $secret_key)
         {
-           if(!$this->isEmailExist($email))
-           {
-                $stmt = $this->conn->prepare("INSERT INTO users (name, email, matnum, username, password) VALUES (?, ?, ?, ?, ?)");
-                $stmt->bind_param("sssss", $name, $email, $matnum, $username, $password);
-                if($stmt->execute())
+            try{
+                if(!$this->isEmailExist($email))
                 {
-                    return USER_CREATED;
-                }else {
-                    return USER_FAILED;
+                    $stmt = $this->conn->prepare("INSERT INTO users (`name`, email, matnum, username, `password`) VALUES ('$name', '$email', '$matnum', '$username', '$secret_key')");
+                    if($stmt->execute())
+                    {
+                        return USER_CREATED;
+                    }else {
+                        return USER_FAIL;
+                    }
                 }
-           }
-           return USER_EXISTS;
+                else{
+                 return USER_EXITS;
+                }
+            }catch(PDOExeception $ex) {
+                echo "PDO did not work";
+            }
         }
 
-        public function userLogin($email, $username, $password)
+        public function userLogin($data, $password)
         {
-            require_once dirname(__FILE__) . '/passwordHash.php';
-            if($this->isEmailExist($email))
-            {
-                $secret_key = $this->getUserPassword($email, $username);
-                if(passwordHash::check_password($secret_key, $password))
+            try {
+                require_once dirname(__FILE__) . '/passwordHash.php';
+                if($this->isDetailsExist($data))
                 {
-                    if(!isset($_SESSION))
+                    $user = $this->getUserPassword($data, $password);
+                    if(passwordHash::check_password($user["password"], $password))
                     {
-                        session_start();
+                        if(!isset($_SESSION))
+                        {
+                            session_start();
+                        }
+                        $_SESSION['id'] = $user["id"];
+                        $_SESSION['timestamp'] = time();
+                        return USER_VERIFIED;
+                    }else {
+                        return USER_PASS_ERR;
                     }
-                    $_SESSION['id'] = 'id';
-                    return USER_VERIFIED;
                 }else {
-                    return USER_PASS_ERR;
+                    return USER_NULL;
                 }
-            }else {
-                return USER_NULL;
+            }catch (PDOException $ex) {
+                echo "PDO did not work";
             }
+        }
+
+        private function isEmailExist($email) {
+            try {
+                $stmt = $this->conn->prepare("SELECT email FROM users WHERE email = :email");
+                $stmt->execute(array(':email' => $email));
+                $res = $stmt->fetch(PDO::FETCH_ASSOC);
+                if($stmt->rowCount() > 0){
+                    return $res;
+                }else{
+                    return NULL;
+                }
+            } catch(PDOException $ex) {
+                return NULL;
+            }
+        }
+ 
+        private function isDetailsExist($data)
+        {
+            $stmt = $this->conn->prepare("SELECT id FROM users WHERE email =:details OR username =:details");
+            $stmt->execute(array(':details' => $data));
+            $stmt->fetch(PDO::FETCH_ASSOC);
+            return $stmt->rowCount() > 0;
         }
 
         private function getUserPassword($data, $password)
         {
-            $stmt = $this->conn->prepare("SELECT email, username, password FROM users WHERE 
-            email = $data OR username = $data");
+            $stmt = $this->conn->prepare("SELECT email, username, password FROM users 
+            WHERE email =:userdetails OR username =:userdetails");
+            $stmt->bindParam(":userdetails", $data);
             $stmt->execute();
-            $stmt->bind_result($password);
-            $stmt->fetch();
-            return $password;
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $row;
+        }
+
+        public function getUserByData($data)
+        {
+            $stmt = $this->conn->prepare("SELECT id, `name`, email, matnum, username FROM users WHERE 
+            email =:details OR username =:details");
+            $stmt->bindParam(":details", $data);
+            $stmt->execute();
+            $data = $stmt->fetch(PDO::FETCH_ASSOC);
+            $user = array();
+            if($stmt->rowCount() > 0){
+                $user['id'] = $data["id"];
+                $user['name'] = $data["name"];
+                $user['email'] = $data["email"];
+                $user['matnum'] = $data["matnum"];
+                $user['username'] = $data["username"];
+                return $user;
+            }else{
+                return NULL;
+            }
         }
 
         public function getSession()
@@ -70,7 +123,9 @@
             if(isset($_SESSION['id']))
             {
                 $sess["id"] = $_SESSION['id'];
-                $sess["createdAt"] = $_SESSION['createdAt'];
+                $sess["email"] = $_SESSION['email'];
+                $sess["username"] = $_SESSION['username'];
+                $sess["timestamp"] = $_SESSION['timestamp'];
             }else {
                 $sess = "Error";
             }
@@ -85,7 +140,9 @@
             if(isSet($_SESSION['id']))
             {
                 unset($_SESSION['id']);
-                unset($_SESSION['createdAt']);
+                unset($_SESSION['email']);
+                unset($_SESSION['username']);
+                unset($_SESSION['timestamp']);
                 session_destroy();
                 session_unset();
                 $info='info';
@@ -101,44 +158,4 @@
             }
             return $msg;
         }
-
-       /* private function getUserPasswordByEmail($email)
-        {
-            $stmt = $this->conn->prepare("SELECT password FROM users WHERE email = ?");
-            $stmt->bind_param("s", $email);
-            $stmt->execute();
-            $stmt->bind_result($password);
-            $stmt->fetch();
-            return $password;
-        }
-
-        private function getUserPasswordByUsername($username)
-        {
-            $stmt = $this->conn->prepare("SELECT password FROM users WHERE username = ?");
-            $stmt->bind_param("s", $username);
-            $stmt->execute();
-            $stmt->bind_result($password);
-            $stmt->fetch();
-            return $password;
-        }*/
-
-        private function isEmailExist($email)
-        {
-            $stmt = $this->conn->prepare("SELECT id FROM users WHERE email = ?");
-            $stmt->bind_param("s", $email);
-            $stmt->execute();
-            $stmt->store_results();
-            return $stmt->num_rows > 0;
-        }
-
-        private function isUsernameExist($username)
-        {
-            $stmt = $this->conn->prepare("SELECT id FROM users WHERE username = ?");
-            $stmt->bind_param("s", $username);
-            $stmt->execute();
-            $stmt->store_results();
-            return $stmt->num_rows > 0;
-        }
-
-
     }

@@ -1,31 +1,31 @@
 <?php
 
-class dbConnect {
+class DbConnect {
 
     private $conn;
+
 
     function __construct() {
     }
 
-    /**
-     * Establishing database connection
-     * @return database connection handler
-     */
     function connect() {
-        include_once './../conf/config.php';
+        require_once('./../conf/config.php');
+        $server = DB_HOST;
+        $user = DB_USER;
+        $db = DB_NAME;
+        $pass = DB_PASS;
 
-        // Connecting to mysql database
-        $this->conn = new mysqli(DB_HOST, DB_USERNAME, DB_PASSWORD, DB_NAME);
-
-        // Check for database connection error
-        if (mysqli_connect_errno()) {
-            echo "Failed to connect to MySQL: " . mysqli_connect_error();
+        try
+        {
+            $this->conn = new PDO("mysql:host=$server;dbname=$db", $user, $pass);
+            // set the PDO error mode to exception
+            $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            echo "success";
         }
-
-        // returing connection resource
+        catch(PDOException $e)
+        {
+            echo "Connection failed: " . $e->getMessage();
+        }
         return $this->conn;
     }
-
 }
-
-?>
