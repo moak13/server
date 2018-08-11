@@ -14,6 +14,6 @@ define('USER_NULL', 202);
 define('USER_PASS_ERR', 203);
 
 define('USER_LOGOUT', 301);
-define('USER_LOG_ERR', 302);
+define('USER_LOGOUT_ERR', 302);
 
 ?>

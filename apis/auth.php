@@ -42,12 +42,6 @@
                     $user = $this->getUserPassword($data, $password);
                     if(passwordHash::check_password($user["password"], $password))
                     {
-                        if(!isset($_SESSION))
-                        {
-                            session_start();
-                        }
-                        $_SESSION['id'] = $user["id"];
-                        $_SESSION['timestamp'] = time();
                         return USER_VERIFIED;
                     }else {
                         return USER_PASS_ERR;
@@ -102,11 +96,21 @@
             $data = $stmt->fetch(PDO::FETCH_ASSOC);
             $user = array();
             if($stmt->rowCount() > 0){
-                $user['id'] = $data["id"];
-                $user['name'] = $data["name"];
-                $user['email'] = $data["email"];
-                $user['matnum'] = $data["matnum"];
-                $user['username'] = $data["username"];
+                if(session_status() == PHP_SESSION_NONE){
+                    session_start();
+                }
+                $_SESSION['id'] = $data['id'];
+                $_SESSION['email'] = $data['email'];
+                $_SESSION['username'] = $data['username'];
+                $_SESSION['name'] = $data['name'];
+                $_SESSION['matnum'] = $data['matnum'];
+                $_SESSION['timestamp']=time();
+                $user['id'] = $_SESSION['id'];
+                $user['name'] = $_SESSION['name'];
+                $user['email'] = $_SESSION['email'];
+                $user['matnum'] = $_SESSION['matnum'];
+                $user['username'] = $_SESSION['username'];
+                $user['active'] = $_SESSION['timestamp'];
                 return $user;
             }else{
                 return NULL;
@@ -145,16 +149,11 @@
                 unset($_SESSION['timestamp']);
                 session_destroy();
                 session_unset();
-                $info='info';
-                if(isSet($_COOKIE[$info]))
-                {
-                    setcookie ($info, '', time() - $cookie_time);
-                }
-                $msg = "Logged Out Successfully...";
+                $msg = USER_LOGOUT;
             }
             else
             {
-                $msg = "Not logged in...";
+                $msg = USER_LOGOUT_ERR;
             }
             return $msg;
         }

@@ -111,26 +111,22 @@ $app->post('/logout', function(Request $request, Response $response)
 {
     $db = new auth;
     $request = $db->destroySession();
-    $message = array();
-    $message['error'] = false;
-    $message['message'] = 'Logout Successful!';
-    $response->write(json_encode($message));
-    return $response->withHeader('Content-type', 'application/json')->withStatus(201);
-    /**if($request == USER_LOGOUT)
+    if($request == USER_LOGOUT)
     {
         $message = array();
         $message['error'] = false;
         $message['message'] = 'Logout Successful!';
         $response->write(json_encode($message));
-        return $response->withHeader('Content-type', 'application/json')->withStatus(201);
+        return $response->withHeader('Content-type', 'application/json')->withStatus(200);
     }
-    else{
+    else if($request == USER_LOGOUT_ERR)
+    {
         $message = array();
         $message['error'] = true;
-        $message['message'] = 'Error In Logging Out!';
+        $message['message'] = 'Logout Unsuccessful!';
         $response->write(json_encode($message));
         return $response->withHeader('Content-type', 'application/json')->withStatus(422);
-    }**/
+    }
 
 });
 
